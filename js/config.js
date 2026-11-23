@@ -3,6 +3,6 @@
    To go live, paste your Supabase project URL and the public "anon" key.
    The anon key is safe in the browser. NEVER paste the service_role key here. */
 window.HF_CONFIG = {
-  supabaseUrl: '',
-  supabaseAnonKey: ''
+  supabaseUrl: 'https://gaidqgrymmsdwrdejejy.supabase.co/rest/v1/',
+  supabaseAnonKey: 'sb_publishable_OROIjoMQpKz1DYUvTUmkkA_Txq-MeqT'
 };
