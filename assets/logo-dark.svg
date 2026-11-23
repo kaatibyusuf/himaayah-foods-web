@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Himaayah Foods">
+  <rect width="64" height="64" rx="14" fill="#0F0F11"/>
+  <g transform="translate(8 8) scale(.75)">
+    <path fill="#FFBB00" d="M32 3 56 11.5V30c0 14.2-9.8 25-24 31C17.8 55 8 44.2 8 30V11.5z"/>
+    <path fill="none" stroke="#0F0F11" stroke-width="3" stroke-linecap="round" d="M25 26c-3-4 3-7 0-12M32 26c-3-4 3-7 0-12M39 26c-3-4 3-7 0-12"/>
+    <rect x="14.5" y="29" width="35" height="3.6" rx="1.8" fill="#0F0F11"/>
+    <path fill="#0F0F11" d="M17.5 33.6h29c0 8.6-6.4 13.8-14.5 13.8S17.5 42.2 17.5 33.6z"/>
+    <rect x="25.5" y="48.6" width="13" height="3" rx="1.5" fill="#0F0F11"/>
+  </g>
+</svg>
