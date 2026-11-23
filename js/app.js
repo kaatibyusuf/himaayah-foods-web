@@ -1,7 +1,7 @@
 /* Himaayah Foods: one eatery, one menu, one kitchen.
    Data lives in localStorage so the whole order flow works with no backend.
    Sign-in is per tab, so one browser can be customer, kitchen and rider at once and orders move between tabs live.
-   To go live, swap the store functions (getDB / mutate / sign-in) for Supabase calls: see supabase/schema.sql. */
+   Live mode: fill in js/config.js and js/remote.js swaps the same functions for Supabase (see supabase/schema.sql and README). */
 (() => {
   'use strict';
 
@@ -121,14 +121,24 @@
     users[1].favs = [item('Jollof rice and chicken').id, item('Beef suya').id, item('Pounded yam and egusi').id];
     return { store, users, menu, orders };
   }
+  const R = window.HF_REMOTE || null;          // set by js/remote.js when Supabase is configured
+  let remoteDB = { store: { name: 'Himaayah Foods', open: true, fee: 500, eta: 30, address: CITY, base: 4.7, ratingSum: 0, ratingCount: 0 }, menu: [], users: [], orders: [] };
+  let remoteUid = null;
   let cache = null, cacheRaw = null, lastStatus = {};
   function getDB() {
+    if (R) return remoteDB;
     const raw = localStorage.getItem(KEY);
     if (!raw) { const s = seed(); localStorage.setItem(KEY, JSON.stringify(s)); cacheRaw = localStorage.getItem(KEY); return (cache = s); }
     if (raw !== cacheRaw) { cache = JSON.parse(raw); cacheRaw = raw; }
     return cache;
   }
   function mutate(fn) {
+    if (R) {
+      const before = remoteDB, d = JSON.parse(JSON.stringify(before));
+      fn(d); remoteDB = d; lastStatus = snapshot(); render(true);
+      R.persist(before, d, remoteUid).catch(e => toast(e.message)).then(() => R.load()).then(db => { remoteDB = db; lastStatus = snapshot(); render(true); }).catch(() => {});
+      return;
+    }
     const d = JSON.parse(JSON.stringify(getDB()));
     fn(d);
     localStorage.setItem(KEY, JSON.stringify(d));
@@ -137,7 +147,7 @@
     render(true);
   }
   // Sign-in is per tab (sessionStorage) so one browser can be customer, kitchen and rider at once.
-  const session = () => sessionStorage.getItem(SKEY);
+  const session = () => R ? remoteUid : sessionStorage.getItem(SKEY);
   const me = () => { const id = session(); return id ? getDB().users.find(u => u.id === id) || null : null; };
   const getCart = () => { try { const c = JSON.parse(localStorage.getItem(CKEY)); return c && c.items ? c : { items: {} }; } catch (e) { return { items: {} }; } };
   const setCart = c => { localStorage.setItem(CKEY, JSON.stringify(c)); };
@@ -201,7 +211,7 @@
         <nav aria-label="Explore"><h4>Explore</h4><a href="#/menu">Menu</a><a href="#/login">Sign in</a><a href="#/register">Create account</a></nav>
         <nav aria-label="Work with us"><h4>Work with us</h4><a href="#/register">Ride with us</a></nav>
         <div><h4>Contact</h4><p class="l">${CITY}, Ekiti State</p><p class="l">Open daily for delivery</p></div></div>
-        <div class="foot-base"><span>© ${year} Himaayah Foods. All rights reserved.</span><span>Cooked fresh, delivered honest. <button data-act="reset-demo">Reset demo data</button></span></div></div></footer>`;
+        <div class="foot-base"><span>© ${year} Himaayah Foods. All rights reserved.</span><span>Cooked fresh, delivered honest.${R ? '' : ' <button data-act="reset-demo">Reset demo data</button>'}</span></div></div></footer>`;
   }
 
   /* ---------- views: public ---------- */
@@ -236,8 +246,8 @@
         <button class="btn block" type="submit">Sign in</button>
       </form>
       <p class="muted">New here? <a href="#/register"><b>Create an account</b></a></p>
-      <div class="card stack"><div><h3>Try a demo account</h3><p class="muted small">Password for all demo accounts is <b>demo123</b>. Open the app in separate tabs to watch an order move between customer, kitchen and rider.</p></div>
-        <div class="row wrap">${demos.map(d => `<button class="btn ghost sm" data-act="quick" data-email="${d[1]}">${d[0]}</button>`).join('')}</div></div></div></div>`;
+      ${R ? '' : `<div class="card stack"><div><h3>Try a demo account</h3><p class="muted small">Password for all demo accounts is <b>demo123</b>. Open the app in separate tabs to watch an order move between customer, kitchen and rider.</p></div>
+        <div class="row wrap">${demos.map(d => `<button class="btn ghost sm" data-act="quick" data-email="${d[1]}">${d[0]}</button>`).join('')}</div></div>`}</div></div>`;
   }
   function viewRegister() {
     return `<div class="container auth-wrap"><div class="stack" style="width:min(460px,100%)">
@@ -413,7 +423,7 @@
       <div class="card stack" style="max-width:640px"><h3>Payment methods</h3>
         <div>${cards.length ? cards.map(k => `<div class="addr"><span style="color:var(--amber)">${I.receipt}</span><div class="grow"><p><b>${esc(k.brand)} ending ${esc(k.last4)}</b></p><p class="muted small">Demo card</p></div><button class="btn ghost sm" data-act="card-del" data-id="${k.id}" aria-label="Remove ${esc(k.brand)} ${esc(k.last4)}">Remove</button></div>`).join('') : '<p class="muted">No saved cards. Pay on delivery is always available.</p>'}</div>
         <form class="form" data-form="add-card" style="max-width:none" novalidate><div class="two"><div class="field"><label for="kb">Card type</label><select class="input" id="kb" name="brand"><option>Visa</option><option>Mastercard</option><option>Verve</option></select></div><div class="field"><label for="k4">Last 4 digits</label><input class="input" id="k4" name="last4" inputmode="numeric" maxlength="4" pattern="[0-9]{4}" required></div></div><p class="muted small">We only keep the card type and last 4 digits for this demo. Never enter a full card number.</p><button class="btn" type="submit">Save card</button></form></div>
-      <div class="row wrap"><button class="btn ghost" data-act="logout">Log out</button><button class="btn ghost" data-act="reset-demo">Reset demo data</button></div>`;
+      <div class="row wrap"><button class="btn ghost" data-act="logout">Log out</button>${R ? '' : '<button class="btn ghost" data-act="reset-demo">Reset demo data</button>'}</div>`;
   }
 
   /* ---------- views: kitchen ---------- */
@@ -525,7 +535,7 @@
     setCart(c); render(true);
   }
   function afterLogin(u) {
-    sessionStorage.setItem(SKEY, u.id);
+    if (R) remoteUid = u.id; else sessionStorage.setItem(SKEY, u.id);
     const next = sessionStorage.getItem('hf_next'); sessionStorage.removeItem('hf_next');
     go(next && u.role === 'customer' ? next : homeFor(u));
     render();
@@ -562,8 +572,8 @@
       }
       case 'clear-cart': setCart({ items: {} }); render(true); break;
       case 'quick': { const u = getDB().users.find(x => x.email === t.dataset.email); if (u) afterLogin(u); break; }
-      case 'logout': sessionStorage.removeItem(SKEY); go('/'); render(); break;
-      case 'reset-demo': if (confirm('Reset all demo data in this browser?')) { localStorage.removeItem(KEY); localStorage.removeItem(CKEY); sessionStorage.removeItem(SKEY); cacheRaw = null; go('/'); render(); toast('Demo data reset.'); } break;
+      case 'logout': if (R) { R.signOut().finally(() => { remoteUid = null; remoteDB = { ...remoteDB, users: [], orders: [] }; go('/'); render(); }); break; } sessionStorage.removeItem(SKEY); go('/'); render(); break;
+      case 'reset-demo': if (!R && confirm('Reset all demo data in this browser?')) { localStorage.removeItem(KEY); localStorage.removeItem(CKEY); sessionStorage.removeItem(SKEY); cacheRaw = null; go('/'); render(); toast('Demo data reset.'); } break;
       case 'cancel-order': mutate(d => { const o = d.orders.find(x => x.id === id); if (o && o.status === 'placed') setStatus(d, id, 'cancelled'); }); break;
       case 'rate': mutate(d => { const o = d.orders.find(x => x.id === id); if (!o || o.rating) return; o.rating = Number(t.dataset.v); d.store.ratingSum += o.rating; d.store.ratingCount += 1; }); toast('Thanks for your rating!'); break;
       case 'r-accept': mutate(d => setStatus(d, id, 'preparing')); break;
@@ -595,10 +605,24 @@
     e.preventDefault();
     const fd = Object.fromEntries(new FormData(f).entries()), kind = f.dataset.form, db = getDB();
     if (kind === 'search') { if (location.hash !== '#/menu') { go('/menu'); render(); } }
+    if (kind === 'login' && R) {
+      R.signIn((fd.email || '').trim(), fd.pass || '').then(async id => { remoteUid = id; remoteDB = await R.load(); afterLogin(remoteDB.users.find(x => x.id === id)); })
+        .catch(() => showErr('lerr', 'That email and password don’t match. Check them and try again.'));
+      return;
+    }
     if (kind === 'login') {
       const u = db.users.find(x => x.email.toLowerCase() === (fd.email || '').trim().toLowerCase() && x.pass === fd.pass);
       if (!u) return showErr('lerr', 'That email and password don’t match. Check them and try again.');
       afterLogin(u);
+    }
+    if (kind === 'register' && R) {
+      const email = (fd.email || '').trim().toLowerCase();
+      if (!fd.name.trim() || !email || (fd.pass || '').length < 6) return showErr('rerr', 'Enter your name, email and a password of at least 6 characters.');
+      R.signUp({ name: fd.name.trim(), email, pass: fd.pass, phone: fd.phone || '', role: fd.role === 'rider' ? 'rider' : 'customer' }).then(async id => {
+        if (!id) return showErr('rerr', 'Check your email to confirm your account, then sign in.');
+        remoteUid = id; remoteDB = await R.load(); afterLogin(remoteDB.users.find(x => x.id === id));
+      }).catch(err => showErr('rerr', err.message));
+      return;
     }
     if (kind === 'register') {
       const email = (fd.email || '').trim().toLowerCase();
@@ -616,6 +640,13 @@
       if (!c.lines.length) return;
       if (!db.store.open) return showErr('cerr', 'We’ve just closed. Try again later.');
       if (!fd.phone.trim() || !fd.address.trim()) return showErr('cerr', 'Add a phone number and delivery address so the rider can find you.');
+      if (R) {
+        const btn = f.querySelector('button[type=submit]'); if (btn) btn.disabled = true;
+        R.placeOrder({ items: c.lines.map(l => ({ id: l.id, qty: l.qty })), address: fd.address, phone: fd.phone, note: fd.note || '', pay: fd.pay === 'card' ? 'card' : 'cod', promo: ui.promo, usePoints: redeem })
+          .then(async id => { setCart({ items: {} }); ui.promo = ''; remoteDB = await R.load(); lastStatus = snapshot(); go('/order/' + id); toast('Order placed. The kitchen will confirm shortly.'); })
+          .catch(err => { if (btn) btn.disabled = false; showErr('cerr', err.message); });
+        return;
+      }
       const order = { id: uid('o'), customerId: u.id, items: c.lines.map(l => ({ id: l.id, name: l.name, price: l.price, qty: l.qty, img: l.img || '' })), subtotal: c.subtotal, fee: c.fee, discount: c.discount, promo: c.promo, total: c.total, address: fd.address.trim(), phone: fd.phone.trim(), note: (fd.note || '').trim(), pay: fd.pay, status: 'placed', riderId: null, rating: 0, pointsUsed: redeem ? REDEEM : 0, createdAt: Date.now(), history: [{ s: 'placed', t: Date.now() }] };
       setCart({ items: {} }); ui.promo = '';
       mutate(d => { d.orders.push(order); const cu = d.users.find(x => x.id === u.id); cu.phone = fd.phone.trim(); cu.address = fd.address.trim(); cu.addresses = cu.addresses || []; if (!cu.addresses.length) cu.addresses.push({ id: uid('a'), label: 'Home', text: fd.address.trim(), def: true }); });
@@ -641,12 +672,23 @@
     });
   }
   window.addEventListener('storage', e => {
+    if (R) return;
     if (e.key === KEY || e.key === CKEY || e.key === null) { cacheRaw = null; const db = getDB(); notifyDiff(lastStatus, db, me()); lastStatus = snapshot(); render(true); }
   });
   window.addEventListener('hashchange', () => { window.scrollTo(0, 0); render(); $('#app').focus({ preventScroll: true }); });
   setInterval(() => { if (!document.hidden && !$('form[data-form="checkout"]')) render(true); }, 60000);
 
-  getDB(); lastStatus = snapshot();
-  render();
+  if (R) {
+    // Live mode: restore the sign-in, load everything, then listen for changes from other devices.
+    $('#app').innerHTML = '<div class="container" style="padding:60px 0"><p class="muted">Loading…</p></div>';
+    R.init().then(async id => { remoteUid = id; remoteDB = await R.load(); }).catch(() => { toast('Can’t reach the server. Check your connection.'); })
+      .finally(() => { lastStatus = snapshot(); render(); });
+    R.subscribe(async () => {
+      try {
+        const db = await R.load(); remoteDB = db; notifyDiff(lastStatus, db, me()); lastStatus = snapshot();
+        if (!$('form[data-form="checkout"]')) render(true);
+      } catch (e) { /* keep showing what we have */ }
+    });
+  } else { getDB(); lastStatus = snapshot(); render(); }
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(() => {});
 })();

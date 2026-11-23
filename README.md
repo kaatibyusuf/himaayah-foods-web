@@ -27,3 +27,21 @@ Open several tabs signed in as different roles to watch an order move live.
 ## Going live
 
 Data is in localStorage for now. Replace `getDB` / `mutate` / sign-in in `js/app.js` with Supabase calls, and add Paystack for card payments. Use photos you own or have licences for before launch.
+
+## Going live with Supabase
+
+The app runs in demo mode until `js/config.js` has your keys. Then accounts, menu, orders and live updates are shared across every device.
+
+1. Create a free project at supabase.com.
+2. Open **SQL Editor > New query**, paste all of `supabase/schema.sql`, and run it. This creates the tables, security rules, order functions and the starting menu.
+3. Open **Authentication > Providers > Email** and turn **Confirm email** off while testing (otherwise new users must click an email link before signing in).
+4. Open **Project Settings > API**. Copy the **Project URL** and the **anon public** key into `js/config.js`. Never use the `service_role` key.
+5. Sign up in the app as yourself, then in the SQL Editor make staff accounts:
+   `update public.profiles set role = 'admin' where email = 'you@example.com';`
+   `update public.profiles set role = 'kitchen' where email = 'kitchen@example.com';`
+   Riders and customers choose their role when they register.
+6. Commit and push. Vercel redeploys.
+
+How it stays safe: browsers can only use the public key. Row level security limits who can read what, and orders are created and changed only through server functions that work out prices, fees, discounts and points themselves.
+
+Not included yet: real card payments (Paystack), and uploading dish photos from the kitchen screen.
