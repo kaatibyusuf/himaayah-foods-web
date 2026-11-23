@@ -6,7 +6,7 @@
   'use strict';
 
   const CITY = 'Ado-Ekiti';
-  const KEY = 'hf_db_v7', SKEY = 'hf_session_v1', CKEY = 'hf_cart_v2';
+  const KEY = 'hf_db_v8', SKEY = 'hf_session_v1', CKEY = 'hf_cart_v2';
   const REDEEM = 300;          // loyalty points needed for free delivery
   const IMG = n => 'assets/img/' + n + '.jpg';
   const PROMOS = {
@@ -17,6 +17,22 @@
   /* ---------- helpers ---------- */
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  // Shrinks a photo in the browser so uploads are fast on mobile data (max 900px, JPEG).
+  const shrink = file => new Promise((ok, no) => {
+    if (!file || !/^image\//.test(file.type)) return no(new Error('Choose an image file.'));
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => {
+      const k = Math.min(1, 900 / Math.max(img.width, img.height)), c = document.createElement('canvas');
+      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
+      c.toBlob(b => b ? ok(b) : no(new Error('Could not read that image.')), 'image/jpeg', 0.82);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); no(new Error('Could not read that image.')); };
+    img.src = url;
+  });
+  const blobToUrl = b => new Promise(ok => { const r = new FileReader(); r.onload = () => ok(r.result); r.readAsDataURL(b); });
+  // Live mode uploads to Supabase Storage; demo mode keeps a small copy in this browser.
+  const savePhoto = async file => { const b = await shrink(file); return R ? R.uploadImage(b) : blobToUrl(b); };
   const naira = n => '₦' + Math.round(Number(n) || 0).toLocaleString('en-NG');
   const uid = p => p + '_' + Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-3);
   const oid = o => o.id.slice(-6).toUpperCase();
@@ -78,7 +94,7 @@
     const M = rows => rows.forEach(([name, desc, price, cat, img]) => menu.push({ id: uid('m'), name, desc, price, cat, img: img ? IMG(img) : '', available: true }));
     M([
       ['Jollof rice and chicken', 'Smoky party jollof with grilled chicken.', 3800, 'Rice', 'jollof'],
-      ['Fried rice and chicken', 'Mixed veg, with a side of plantain.', 4000, 'Rice'],
+      ['Fried rice and chicken', 'Mixed veg, with a side of plantain.', 4000, 'Rice', 'fried-rice-chicken'],
       ['Coconut rice', 'Fragrant coconut rice with fish stew.', 3500, 'Rice', 'fried-rice'],
       ['Ofada rice and stew', 'With ayamase sauce and egg.', 3500, 'Rice', 'ofada'],
       ['Jollof rice (small)', 'Plain portion.', 1800, 'Rice', 'jollof'],
@@ -449,13 +465,15 @@
   function viewKitchenMenu() {
     const db = getDB(), items = db.menu, cats = [...new Set(items.map(m => m.cat))];
     return `<h1>Menu manager</h1><div class="split"><div class="card">${items.length ? items.map(m => `<div class="item${m.available ? '' : ' off'}">${thumb(m.img, m.name, m.id)}<div class="grow"><h3 style="font-size:15.5px">${esc(m.name)}</h3><p class="muted small">${esc(m.cat)} · ${esc(m.desc)}</p><p class="price">${naira(m.price)}</p></div>
-      <div class="row wrap"><label class="switch"><input type="checkbox" data-act="m-toggle" data-id="${m.id}" ${m.available ? 'checked' : ''} aria-label="Available: ${esc(m.name)}"><span class="small">${m.available ? 'Available' : 'Sold out'}</span></label>
-      <button class="btn ghost sm" data-act="m-price" data-id="${m.id}">Price</button><button class="btn ghost sm" data-act="m-delete" data-id="${m.id}">Delete</button></div></div>`).join('') : '<p class="muted">No items yet. Add your first dish.</p>'}</div>
+      <div class="row wrap mi-actions"><label class="switch"><input type="checkbox" data-act="m-toggle" data-id="${m.id}" ${m.available ? 'checked' : ''} aria-label="Available: ${esc(m.name)}"><span class="small">${m.available ? 'Available' : 'Sold out'}</span></label>
+      <button class="btn ghost sm" data-act="m-price" data-id="${m.id}">Price</button><label class="btn ghost sm filebtn">${m.img ? 'Change photo' : 'Add photo'}<input type="file" accept="image/*" hidden data-act="m-photo" data-id="${m.id}" aria-label="Photo for ${esc(m.name)}"></label><button class="btn ghost sm" data-act="m-delete" data-id="${m.id}">Delete</button></div></div>`).join('') : '<p class="muted">No items yet. Add your first dish.</p>'}</div>
       <form class="card stack" data-form="add-item" novalidate><h3>Add a dish</h3>
         <div class="field"><label for="mn">Name</label><input class="input" id="mn" name="name" required></div>
         <div class="field"><label for="md">Description</label><input class="input" id="md" name="desc"></div>
         <div class="two"><div class="field"><label for="mp">Price (₦)</label><input class="input" id="mp" name="price" type="number" min="0" step="50" required></div>
         <div class="field"><label for="mc">Category</label><input class="input" id="mc" name="cat" list="catlist" value="${esc(cats[0] || 'Rice')}"><datalist id="catlist">${cats.map(c => `<option value="${esc(c)}">`).join('')}</datalist></div></div>
+        <div class="field"><label for="mph">Photo (optional)</label><input class="input" id="mph" name="photo" type="file" accept="image/*"></div>
+        <p class="notice bad" id="merr" hidden></p>
         <button class="btn yellow" type="submit">Add to menu</button></form></div>`;
   }
   function viewKitchenSettings() {
@@ -590,6 +608,10 @@
     const act = t.dataset.act, id = t.dataset.id;
     if (act === 'sort') { ui.sort = t.value; render(true); }
     if (act === 'toggle-open') mutate(d => { d.store.open = t.checked; });
+    if (act === 'm-photo') {
+      const file = t.files && t.files[0]; if (!file) return; toast('Uploading photo…');
+      savePhoto(file).then(url => { mutate(d => { d.menu.find(x => x.id === id).img = url; }); toast('Photo saved.'); }).catch(err => toast(err.message || 'Upload failed.'));
+    }
     if (act === 'm-toggle') mutate(d => { d.menu.find(x => x.id === id).available = t.checked; });
     if (act === 'rider-online') mutate(d => { d.users.find(x => x.id === session()).online = t.checked; });
     if (act === 'redeem') refreshSum();
@@ -654,7 +676,10 @@
     }
     if (kind === 'add-item') {
       if (!fd.name.trim() || fd.price === '') return;
-      mutate(d => d.menu.push({ id: uid('m'), name: fd.name.trim(), desc: (fd.desc || '').trim(), price: Number(fd.price), cat: (fd.cat || 'Rice').trim() || 'Rice', img: '', available: true }));
+      const add = img => mutate(d => d.menu.push({ id: uid('m'), name: fd.name.trim(), desc: (fd.desc || '').trim(), price: Number(fd.price), cat: (fd.cat || 'Rice').trim() || 'Rice', img, available: true }));
+      const file = fd.photo && fd.photo.size ? fd.photo : null;
+      if (!file) add('');
+      else savePhoto(file).then(add).catch(err => showErr('merr', err.message || 'Upload failed.'));
     }
     if (kind === 'store-settings') { mutate(d => { d.store.fee = Number(fd.fee) || 0; d.store.eta = Number(fd.eta) || 30; }); toast('Settings saved.'); }
   });

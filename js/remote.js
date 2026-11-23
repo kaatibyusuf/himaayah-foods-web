@@ -58,7 +58,7 @@
     for (const m of after.menu) {
       const old = bm.get(m.id);
       if (!old) must(await sb.from('menu_items').insert({ name: m.name, description: m.desc, price: m.price, category: m.cat, img_url: m.img || '', available: m.available, sort: ++sort }));
-      else if (old.price !== m.price || old.available !== m.available) must(await sb.from('menu_items').update({ price: m.price, available: m.available }).eq('id', m.id));
+      else if (old.price !== m.price || old.available !== m.available || old.img !== m.img) must(await sb.from('menu_items').update({ price: m.price, available: m.available, img_url: m.img || '' }).eq('id', m.id));
     }
     for (const m of before.menu) if (!am.has(m.id)) must(await sb.from('menu_items').delete().eq('id', m.id));
 
@@ -83,6 +83,12 @@
     async signUp({ name, email, pass, phone, role }) {
       const d = must(await sb.auth.signUp({ email, password: pass, options: { data: { name, phone, role } } }));
       return d.session ? d.user.id : null; // null means the project wants the email confirmed first
+    },
+    async uploadImage(blob) {
+      const path = 'menu/' + Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '.jpg';
+      const up = await sb.storage.from('dish-photos').upload(path, blob, { contentType: 'image/jpeg', cacheControl: '31536000' });
+      if (up.error) throw new Error(up.error.message || 'Upload failed');
+      return sb.storage.from('dish-photos').getPublicUrl(path).data.publicUrl;
     },
     async signOut() { await sb.auth.signOut(); },
     async placeOrder(o) {

@@ -315,3 +315,9 @@ textarea.input { min-height: 84px; resize: vertical; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; scroll-behavior: auto !important; } }
 .ph .muted, .hero p, .sec > .muted, .sec .row > div > .muted { color: #4A4A52; }
+
+.filebtn { cursor: pointer; }
+.filebtn:focus-within { outline: 2px solid var(--k); outline-offset: 2px; }
+.item:has(.mi-actions) { flex-wrap: wrap; }
+.item:has(.mi-actions) .mi-actions { flex-basis: 100%; padding-left: 70px; }
+@media (max-width: 600px) { .item:has(.mi-actions) .mi-actions { padding-left: 0; } }

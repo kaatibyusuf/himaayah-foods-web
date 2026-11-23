@@ -285,13 +285,29 @@ do $$ begin
   alter publication supabase_realtime add table public.store;
 exception when duplicate_object then null; end $$;
 
+
+-- ---------- dish photo uploads ----------
+insert into storage.buckets (id, name, public) values ('dish-photos', 'dish-photos', true) on conflict (id) do nothing;
+
+drop policy if exists dish_photos_read on storage.objects;
+create policy dish_photos_read on storage.objects for select using (bucket_id = 'dish-photos');
+drop policy if exists dish_photos_insert on storage.objects;
+create policy dish_photos_insert on storage.objects for insert to authenticated
+  with check (bucket_id = 'dish-photos' and public.my_role() in ('kitchen', 'admin'));
+drop policy if exists dish_photos_update on storage.objects;
+create policy dish_photos_update on storage.objects for update to authenticated
+  using (bucket_id = 'dish-photos' and public.my_role() in ('kitchen', 'admin'));
+drop policy if exists dish_photos_delete on storage.objects;
+create policy dish_photos_delete on storage.objects for delete to authenticated
+  using (bucket_id = 'dish-photos' and public.my_role() in ('kitchen', 'admin'));
+
 -- ---------- starting data ----------
 insert into public.store (id) values (1) on conflict (id) do nothing;
 
 insert into public.menu_items (name, description, price, category, img_url, sort)
 select * from (values
   ('Jollof rice and chicken', 'Smoky party jollof with grilled chicken.', 3800, 'Rice', 'assets/img/jollof.jpg', 1),
-  ('Fried rice and chicken', 'Mixed veg, with a side of plantain.', 4000, 'Rice', '', 2),
+  ('Fried rice and chicken', 'Mixed veg, with a side of plantain.', 4000, 'Rice', 'assets/img/fried-rice-chicken.jpg', 2),
   ('Coconut rice', 'Fragrant coconut rice with fish stew.', 3500, 'Rice', 'assets/img/fried-rice.jpg', 3),
   ('Ofada rice and stew', 'With ayamase sauce and egg.', 3500, 'Rice', 'assets/img/ofada.jpg', 4),
   ('Jollof rice (small)', 'Plain portion.', 1800, 'Rice', 'assets/img/jollof.jpg', 5),

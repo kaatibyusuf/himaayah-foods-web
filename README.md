@@ -44,4 +44,6 @@ The app runs in demo mode until `js/config.js` has your keys. Then accounts, men
 
 How it stays safe: browsers can only use the public key. Row level security limits who can read what, and orders are created and changed only through server functions that work out prices, fees, discounts and points themselves.
 
-Not included yet: real card payments (Paystack), and uploading dish photos from the kitchen screen.
+Dish photos: in the SQL Editor also run `supabase/photos.sql` once (it is already inside `schema.sql` for new projects). Then the kitchen can add or change a dish photo from Menu manager.
+
+Not included yet: real card payments (Paystack).
