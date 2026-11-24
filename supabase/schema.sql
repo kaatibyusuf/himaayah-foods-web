@@ -38,7 +38,9 @@ create table if not exists public.store (
   address       text not null default 'Ado-Ekiti',
   base_rating   numeric not null default 4.7,
   rating_sum    int not null default 0,
-  rating_count  int not null default 0
+  rating_count  int not null default 0,
+  lat           double precision not null default 7.6210,   -- kitchen location on the map
+  lng           double precision not null default 5.2214
 );
 
 create table if not exists public.menu_items (
@@ -72,6 +74,11 @@ create table if not exists public.orders (
   note           text not null default '',
   pay            pay_method not null default 'cod',
   rating         int not null default 0 check (rating between 0 and 5),
+  dest_lat       double precision,                        -- where the customer pinned their delivery
+  dest_lng       double precision,
+  rider_lat      double precision,                        -- live rider position while on the way
+  rider_lng      double precision,
+  rider_seen     timestamptz,
   created_at     timestamptz not null default now(),
   updated_at     timestamptz not null default now()
 );
@@ -164,7 +171,8 @@ create policy order_items_select on public.order_items for select using (
 -- ---------- order functions ----------
 -- Prices, fees, discounts and points are all calculated here on the server, never trusted from the browser.
 create or replace function public.place_order(
-  p_items jsonb, p_address text, p_phone text, p_note text, p_pay pay_method, p_promo text, p_use_points boolean
+  p_items jsonb, p_address text, p_phone text, p_note text, p_pay pay_method, p_promo text, p_use_points boolean,
+  p_lat double precision default null, p_lng double precision default null
 ) returns uuid language plpgsql security definer set search_path = public as $$
 declare
   uid uuid := auth.uid();
@@ -209,8 +217,12 @@ begin
   disc := least(disc, sub + fee);
   tot := sub + fee - disc;
 
-  insert into public.orders (customer_id, customer_name, subtotal, fee, discount, promo, total, points_used, address, phone, note, pay)
-  values (uid, prof.name, sub, fee, disc, used_promo, tot, pts, trim(p_address), trim(p_phone), coalesce(trim(p_note), ''), p_pay)
+  if p_lat is not null and p_lng is not null and (p_lat not between -90 and 90 or p_lng not between -180 and 180) then
+    p_lat := null; p_lng := null;
+  end if;
+
+  insert into public.orders (customer_id, customer_name, subtotal, fee, discount, promo, total, points_used, address, phone, note, pay, dest_lat, dest_lng)
+  values (uid, prof.name, sub, fee, disc, used_promo, tot, pts, trim(p_address), trim(p_phone), coalesce(trim(p_note), ''), p_pay, p_lat, p_lng)
   returning id into oid;
 
   insert into public.order_items (order_id, menu_item_id, name, price, qty, img_url)
@@ -270,7 +282,17 @@ begin
   update public.store set rating_sum = rating_sum + p_rating, rating_count = rating_count + 1 where id = 1;
 end $$;
 
-grant execute on function public.place_order(jsonb, text, text, text, pay_method, text, boolean) to authenticated;
+create or replace function public.update_rider_location(p_order uuid, p_lat double precision, p_lng double precision)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if p_lat not between -90 and 90 or p_lng not between -180 and 180 then raise exception 'Invalid location'; end if;
+  update public.orders set rider_lat = p_lat, rider_lng = p_lng, rider_seen = now()
+  where id = p_order and rider_id = auth.uid() and status = 'on_the_way';
+  if not found then raise exception 'Not your active delivery'; end if;
+end $$;
+
+grant execute on function public.place_order(jsonb, text, text, text, pay_method, text, boolean, double precision, double precision) to authenticated;
+grant execute on function public.update_rider_location(uuid, double precision, double precision) to authenticated;
 grant execute on function public.set_order_status(uuid, order_status) to authenticated;
 grant execute on function public.rate_order(uuid, int) to authenticated;
 

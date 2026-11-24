@@ -1,6 +1,6 @@
 // Minimal offline shell: network first, fall back to cache.
-const CACHE = 'hf-shell-v4';
-const SHELL = ['./', 'index.html', 'css/style.css', 'js/app.js', 'js/config.js', 'js/remote.js', 'assets/logo.svg', 'assets/logo-dark.svg'];
+const CACHE = 'hf-shell-v5';
+const SHELL = ['./', 'index.html', 'css/style.css', 'js/app.js', 'js/config.js', 'js/remote.js', 'assets/vendor/leaflet.js', 'assets/vendor/leaflet.css', 'assets/logo.svg', 'assets/logo-dark.svg'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(k => Promise.all(k.filter(x => x !== CACHE).map(x => caches.delete(x)))).then(() => self.clients.claim())); });
 self.addEventListener('fetch', e => {

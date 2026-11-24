@@ -21,7 +21,8 @@
       id: r.id, customerId: r.customer_id, customerName: r.customer_name, riderId: r.rider_id, riderName: r.rider_name, riderPhone: r.rider_phone,
       items: (r.order_items || []).map(i => ({ id: i.menu_item_id, name: i.name, price: i.price, qty: i.qty, img: i.img_url || '' })),
       subtotal: r.subtotal, fee: r.fee, discount: r.discount, promo: r.promo, total: r.total, pointsUsed: r.points_used,
-      address: r.address, phone: r.phone, note: r.note, pay: r.pay, status: r.status, rating: r.rating, createdAt: created, history
+      address: r.address, phone: r.phone, note: r.note, pay: r.pay, status: r.status, rating: r.rating, createdAt: created, history,
+      destLat: r.dest_lat, destLng: r.dest_lng, riderLat: r.rider_lat, riderLng: r.rider_lng, riderSeen: r.rider_seen ? T(r.rider_seen) : 0
     };
   };
 
@@ -43,7 +44,7 @@
       if (o.riderId && !users.some(u => u.id === o.riderId)) users.push({ id: o.riderId, role: 'rider', name: o.riderName || 'Rider', email: '', phone: o.riderPhone || '', favs: [], addresses: [], cards: [] });
     });
     return {
-      store: { name: s.name, open: s.open, fee: s.fee, eta: s.eta, address: s.address, base: Number(s.base_rating), ratingSum: s.rating_sum, ratingCount: s.rating_count },
+      store: { name: s.name, open: s.open, fee: s.fee, eta: s.eta, address: s.address, base: Number(s.base_rating), ratingSum: s.rating_sum, ratingCount: s.rating_count, lat: s.lat, lng: s.lng },
       menu: menu.map(m => ({ id: m.id, name: m.name, desc: m.description, price: m.price, cat: m.category, img: m.img_url || '', available: m.available })),
       users, orders
     };
@@ -51,7 +52,7 @@
 
   async function persist(before, after, myId) {
     const bs = before.store, as = after.store;
-    if (bs.open !== as.open || bs.fee !== as.fee || bs.eta !== as.eta) must(await sb.from('store').update({ open: as.open, fee: as.fee, eta: as.eta }).eq('id', 1));
+    if (bs.open !== as.open || bs.fee !== as.fee || bs.eta !== as.eta || bs.lat !== as.lat || bs.lng !== as.lng) must(await sb.from('store').update({ open: as.open, fee: as.fee, eta: as.eta, lat: as.lat, lng: as.lng }).eq('id', 1));
 
     const bm = new Map(before.menu.map(m => [m.id, m])), am = new Map(after.menu.map(m => [m.id, m]));
     let sort = before.menu.length;
@@ -64,7 +65,7 @@
 
     const bu = before.users.find(u => u.id === myId), au = after.users.find(u => u.id === myId);
     if (bu && au) {
-      const pick = u => ({ phone: u.phone || '', online: !!u.online, addresses: u.addresses || [], cards: u.cards || [], favs: u.favs || [] });
+      const pick = u => ({ name: u.name || '', phone: u.phone || '', online: !!u.online, addresses: u.addresses || [], cards: u.cards || [], favs: u.favs || [] });
       if (!same(pick(bu), pick(au))) must(await sb.from('profiles').update(pick(au)).eq('id', myId));
     }
 
@@ -91,8 +92,10 @@
       return sb.storage.from('dish-photos').getPublicUrl(path).data.publicUrl;
     },
     async signOut() { await sb.auth.signOut(); },
+    // Called every few seconds by the rider's phone while a delivery is on the way.
+    async sendLocation(orderId, lat, lng) { must(await sb.rpc('update_rider_location', { p_order: orderId, p_lat: lat, p_lng: lng })); },
     async placeOrder(o) {
-      return must(await sb.rpc('place_order', { p_items: o.items, p_address: o.address, p_phone: o.phone, p_note: o.note, p_pay: o.pay, p_promo: o.promo || '', p_use_points: !!o.usePoints }));
+      return must(await sb.rpc('place_order', { p_items: o.items, p_address: o.address, p_phone: o.phone, p_note: o.note, p_pay: o.pay, p_promo: o.promo || '', p_use_points: !!o.usePoints, p_lat: o.lat == null ? null : o.lat, p_lng: o.lng == null ? null : o.lng }));
     },
     subscribe(cb) {
       let t = null; const ping = () => { clearTimeout(t); t = setTimeout(cb, 250); };

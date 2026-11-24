@@ -47,3 +47,19 @@ How it stays safe: browsers can only use the public key. Row level security limi
 Dish photos: in the SQL Editor also run `supabase/photos.sql` once (it is already inside `schema.sql` for new projects). Then the kitchen can add or change a dish photo from Menu manager.
 
 Not included yet: real card payments (Paystack).
+
+## Profile and maps (v1.1)
+
+**Profile hub.** `#/account` is now a phone-style profile: points and tier, a live "Track" pill when an order is active, and rows for Profile details, Addresses, Free delivery with points, Payment methods, Order history, Favorites, Offers, Help and FAQs, and Privacy and terms.
+
+**Maps.** Leaflet is bundled in `assets/vendor/` and map tiles come from OpenStreetMap (free, with attribution shown on every map). OpenStreetMap's public tile server is meant for light use; if the app grows, switch the tile URL in `js/app.js` (search for `tile.openstreetmap.org`) to a paid tile provider.
+
+- Customers drop a pin on each saved address and at checkout (tap the map, drag the pin, "Use my current location", or "Find address on map").
+- The kitchen sets its own pin in Kitchen > Settings.
+- When a rider picks up an order, their phone shares its location every few seconds while the page stays open. The customer's order page shows the kitchen, their pin and the rider moving, with distance and a rough arrival time (straight-line distance at about 20 km/h).
+- Riders get an "Open in Google Maps" button for turn-by-turn directions.
+- Demo mode has a "Demo ride" button on the rider screen that moves a pretend rider, so tracking can be tried on a laptop.
+
+**Upgrading a project that is already live.** Open the Supabase SQL editor, paste all of `supabase/tracking.sql` and run it once. It adds the location columns and replaces `place_order`. New projects get this from `schema.sql`.
+
+**Limits to know.** Location sharing needs HTTPS (Vercel is fine) and the rider's browser must stay open on the page, because phones pause web pages when the screen locks. Tracking is a web page, not a background app.
