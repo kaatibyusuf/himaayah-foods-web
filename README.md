@@ -63,3 +63,18 @@ Not included yet: real card payments (Paystack).
 **Upgrading a project that is already live.** Open the Supabase SQL editor, paste all of `supabase/tracking.sql` and run it once. It adds the location columns and replaces `place_order`. New projects get this from `schema.sql`.
 
 **Limits to know.** Location sharing needs HTTPS (Vercel is fine) and the rider's browser must stay open on the page, because phones pause web pages when the screen locks. Tracking is a web page, not a background app.
+
+## v1.2: alerts, fees, promos, wallet, hours, scheduling, reports
+
+**Upgrading a live project.** Run `supabase/v1_2.sql` once in the Supabase SQL editor. It works whether or not you ran `tracking.sql` before, and it is safe to run twice. New projects get everything from `schema.sql`. Run it BEFORE you push this version, because `place_order` now takes extra fields.
+
+**Your keys are never in the update zip.** `js/config.js` is not included, so applying the zip cannot overwrite your Supabase URL and key. `js/config.example.js` shows the format for a fresh install. Your keys also live in Supabase (Project Settings > API, use the publishable key) and in your own git history.
+
+- **Order alerts.** Kitchen > Orders and the customer order page have "Turn on alerts". Kitchen hears a chime for each new order (repeating every 30 seconds until accepted), sees a browser notification when the tab is in the background, and the tab title shows the number waiting. Customers get an alert when their order moves. These work while the page is open. Alerts with the page closed need a push server (Firebase or OneSignal), which is not included. Kitchen can also message customers on WhatsApp from each order card, and customers can message the kitchen from their order. Set the kitchen WhatsApp number in Settings.
+- **Distance delivery fee.** Settings: base fee, km covered by it, extra fee per km, furthest delivery. The fee uses the straight-line distance between the kitchen pin and the customer's pin, rounded to the nearest ₦50, and is worked out again by the database when the order is placed. Extra fee 0 keeps one flat fee.
+- **Promo codes.** Kitchen > Promo codes: percent off, naira off or free delivery, with minimum order, cap, first-order-only, last day and total uses. Codes are checked by the database.
+- **Wallet and referrals.** There is no card gateway yet, so wallets are topped up by bank transfer: the customer sees your bank details, sends proof on WhatsApp, and you add the amount in Kitchen > Wallets. Wallet money can pay all or part of an order, and returns to the wallet if the order is rejected or cancelled. Every customer has a referral code; when a referred customer's first order is delivered, both get the bonus set in Settings (default ₦500).
+- **Opening hours and sold out today.** Settings: automatic hours by day. Outside them customers can still schedule an order. "Sold out today" on a dish switches itself back on tomorrow. The Orders switch pauses everything.
+- **Scheduled orders.** Customers pick a day and time up to 3 days ahead (30-minute slots inside opening hours). Kitchen sees "Scheduled for ..." and when to start cooking.
+- **Reorder and favourites.** "Your usual" row on the menu, and "Add all to cart" on Favorites.
+- **Sales report.** Kitchen > Reports and Owner > Reports: sales, orders, average order, cancellations, fees, discounts, wallet payments, repeat customers, sales per day, busiest hours, top dishes, and a CSV download. Times are Lagos time.
